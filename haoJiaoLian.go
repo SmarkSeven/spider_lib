@@ -9,16 +9,6 @@ import (
 	//信息输出
 	// net包
 	"net/http" //设置http.Header
-	// "net/url"
-	// 编码包
-	// "encoding/xml"
-	// "encoding/json"
-	// 字符串处理包
-	// "regexp"
-	// 其他包
-	// "fmt"
-	// "math"
-	// "time"
 )
 
 func init() {
@@ -35,14 +25,13 @@ var HaoJiaoLianNews = &Spider{
 	RuleTree: &RuleTree{
 		Root: func(ctx *Context) {
 			// 调用指定Rule下辅助函数AidFunc()。
-			ctx.Aid(map[string]interface{}{"loop": [2]int{0, 1}, "Rule": "生成请求"}, "生成请求")
+			ctx.Aid(map[string]interface{}{"loop": [2]int{0, 1}, "Rule": "新闻列表"}, "新闻列表")
 		},
 
 		Trunk: map[string]*Rule{
 
-			"生成请求": {
+			"新闻列表": {
 				AidFunc: func(ctx *Context, aid map[string]interface{}) interface{} {
-					// keyin := EncodeString(ctx.GetKeyin(), "gbk")
 					// for loop := aid["loop"].([2]int); loop[0] < loop[1]; loop[0]++ {
 					ctx.AddQueue(&request.Request{
 						Url:    "http://news.haojiaolian.com/xueche/bj/list_2.html",
@@ -52,155 +41,56 @@ var HaoJiaoLianNews = &Spider{
 					// }
 					return nil
 				},
-				// ParseFunc: func(ctx *Context) {
-				// 	query := ctx.GetDom()
-				// 	// logs.Log.Debug(ctx.GetText())
-				// 	// pageTag := query.Find("#sm-pagination div[data-total-page]")
-				// 	// 跳转
-				// 	// if len(pageTag.Nodes) == 0 {
-				// 	// logs.Log.Critical("[消息提示：| 任务：%v | KEYIN：%v | 规则：%v] 由于跳转AJAX问题，目前只能每个子类抓取 1 页……\n", ctx.GetName(), ctx.GetKeyin(), ctx.GetRuleName())
-				// 	query.Find("#info_list a").Each(func(i int, s *goquery.Selection) {
-				// 		if href, ok := s.Attr("href"); ok {
-				// 			ctx.AddQueue(&request.Request{
-				// 				Url:    href,
-				// 				Header: http.Header{"Content-Type": []string{"text/html; charset=gbk"}},
-				// 				Rule:   "搜索结果",
-				// 			})
-				// 		}
-				// 	})
-				// 	return
-				// }
-				// total1, _ := pageTag.First().Attr("data-total-page")
-				// total1 = strings.Trim(total1, " \t\n")
-				// total, _ := strconv.Atoi(total1)
-				// if total > ctx.GetLimit() {
-				// 	total = ctx.GetLimit()
-				// } else if total == 0 {
-				// 	logs.Log.Critical("[消息提示：| 任务：%v | KEYIN：%v | 规则：%v] 没有抓取到任何数据！！！\n", ctx.GetName(), ctx.GetKeyin(), ctx.GetRuleName())
-				// 	return
-				// }
 
-				// // 调用指定规则下辅助函数
-				// ctx.Aid(map[string]interface{}{"loop": [2]int{1, total}, "Rule": "搜索结果"})
-				// // 用指定规则解析响应流
-				// ctx.Parse("搜索结果")
-				// },
-
-				//注意：有无字段语义和是否输出数据必须保持一致
-				ItemFields: []string{
-					"标题",
-					"链接",
-					// "公司",
-					// "标题",
-					// "价格",
-					// "销量",
-					// "星级",
-					// "地址",
-					// "链接",
-				},
 				ParseFunc: func(ctx *Context) {
 					query := ctx.GetDom()
-
 					query.Find("#info_list ul").Each(func(i int, s *goquery.Selection) {
-
-						// // 获取公司
-						// company, _ := s.Find("a.sm-offer-companyName").First().Attr("title")
-
-						// // 获取标题
-						// t := s.Find(".sm-offer-title > a:nth-child(1)")
-						// title, _ := t.Attr("title")
-
+						// 新闻标题
 						title := s.Find("li > h2").Text()
-
 						// 获取URL
-						url := s.Find("li > h2 a").Text()
+						url, _ := s.Find("li > h2 a").First().Attr("href")
+						// 摘要
+						summary := s.Find("li > span").Text()
 
-						// // 获取价格
-						// price := s.Find(".sm-offer-priceNum").First().Text()
-
-						// // 获取成交量
-						// sales := s.Find("span.sm-offer-trade > em").First().Text()
-
-						// // 获取地址
-						// address, _ := s.Find(".sm-offer-location").First().Attr("title")
-
-						// // 获取信用年限
-						// level := s.Find("span.sm-offer-companyTag > a.sw-ui-flaticon-cxt16x16").First().Text()
-
-						// 结果存入Response中转
-						ctx.Output(map[int]interface{}{
-							0: title,
-							1: url,
-							// 0: company,
-							// 1: title,
-							// 2: price,
-							// 3: sales,
-							// 4: level,
-							// 5: address,
-							// 6: url,
+						ctx.AddQueue(&request.Request{
+							Url:    url,
+							Header: http.Header{"Content-Type": []string{"text/html; charset=gbk"}},
+							Rule:   "新闻详情",
+							Temp: map[string]interface{}{
+								"title":   title,
+								"url":     url,
+								"summary": summary,
+							},
 						})
 					})
 				},
 			},
+
+			"新闻详情": {
+				// 	//注意：有无字段语义和是否输出数据必须保持一致
+				ItemFields: []string{
+					"标题",
+					"链接",
+					"摘要",
+					"时间",
+					"内容",
+				},
+
+				ParseFunc: func(ctx *Context) {
+					query := ctx.GetDom()
+					newsTime := query.Find("#news_time").Text()
+					content := query.Find("#content_news").Text()
+
+					// 结果存入Response中转
+					ctx.Output(map[int]interface{}{
+						0: ctx.GetTemp("title", ""),
+						1: ctx.GetTemp("url", ""),
+						2: ctx.GetTemp("summary", ""),
+						3: newsTime,
+						4: content,
+					})
+				},
+			},
 		},
-
-		// "搜索结果": {
-		// 	//注意：有无字段语义和是否输出数据必须保持一致
-		// 	ItemFields: []string{
-		// 		"标题",
-		// 		"链接",
-		// 		// "公司",
-		// 		// "标题",
-		// 		// "价格",
-		// 		// "销量",
-		// 		// "星级",
-		// 		// "地址",
-		// 		// "链接",
-		// 	},
-		// 	ParseFunc: func(ctx *Context) {
-		// 		query := ctx.GetDom()
-
-		// 		query.Find("#info_list ul").Each(func(i int, s *goquery.Selection) {
-
-		// 			// // 获取公司
-		// 			// company, _ := s.Find("a.sm-offer-companyName").First().Attr("title")
-
-		// 			// // 获取标题
-		// 			// t := s.Find(".sm-offer-title > a:nth-child(1)")
-		// 			// title, _ := t.Attr("title")
-
-		// 			title := s.Find("li > h2").Text()
-
-		// 			// 获取URL
-		// 			url := s.Find("li > h2 > a").Text()
-
-		// 			// // 获取价格
-		// 			// price := s.Find(".sm-offer-priceNum").First().Text()
-
-		// 			// // 获取成交量
-		// 			// sales := s.Find("span.sm-offer-trade > em").First().Text()
-
-		// 			// // 获取地址
-		// 			// address, _ := s.Find(".sm-offer-location").First().Attr("title")
-
-		// 			// // 获取信用年限
-		// 			// level := s.Find("span.sm-offer-companyTag > a.sw-ui-flaticon-cxt16x16").First().Text()
-
-		// 			// 结果存入Response中转
-		// 			ctx.Output(map[int]interface{}{
-		// 				0: title,
-		// 				1: url,
-		// 				// 0: company,
-		// 				// 1: title,
-		// 				// 2: price,
-		// 				// 3: sales,
-		// 				// 4: level,
-		// 				// 5: address,
-		// 				// 6: url,
-		// 			})
-		// 		})
-		// 	},
-		// },
-		// },
 	},
 }
