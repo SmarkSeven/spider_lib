@@ -78,7 +78,7 @@ var HaoJiaoLianNews = &Spider{
 
 				ParseFunc: func(ctx *Context) {
 					query := ctx.GetDom()
-					newsTime := query.Find("#news_time").Text()
+					newsTime := query.Find(".news_time").First().Text()
 					content := query.Find("#content_news").Text()
 
 					// 结果存入Response中转
